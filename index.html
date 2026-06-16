@@ -273,6 +273,56 @@
       color: #c0bab4;
     }
 
+    /* ── ADD TASK ── */
+    .add-task-btn {
+      width: 100%;
+      padding: 5px 8px;
+      background: transparent;
+      border: 1px dashed #d0cbc4;
+      border-radius: 8px;
+      color: #bbb;
+      font-size: 0.75rem;
+      cursor: pointer;
+      font-family: inherit;
+      margin-top: 2px;
+      transition: all 0.15s;
+      text-align: center;
+    }
+    .add-task-btn:hover { border-color: #9dbdcf; color: #6ea8c8; background: #f4f8fb; }
+
+    .add-task-form {
+      background: #f5f3f0;
+      border-radius: 9px;
+      border: 1px solid #ece8e2;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-top: 2px;
+    }
+    .add-task-form select {
+      font-size: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 4px 6px;
+      background: #fff;
+      font-family: inherit;
+      color: #444;
+      width: 100%;
+    }
+    .add-task-actions { display: flex; gap: 6px; }
+    .add-task-ok {
+      flex: 1; padding: 4px; background: #6ea8c8; color: #fff;
+      border: none; border-radius: 6px; font-size: 0.75rem;
+      cursor: pointer; font-family: inherit;
+    }
+    .add-task-ok:hover { background: #5a96b8; }
+    .add-task-cancel {
+      padding: 4px 8px; background: transparent; color: #999;
+      border: 1px solid #ddd; border-radius: 6px; font-size: 0.75rem;
+      cursor: pointer; font-family: inherit;
+    }
+
     /* ── DRAG & DROP ── */
     .chore-block[draggable="true"] { cursor: grab; }
     .chore-block[draggable="true"]:active { cursor: grabbing; }
@@ -302,6 +352,80 @@
       color: #ccc;
       font-size: 0.72rem;
     }
+
+    /* ── WEEK TABS (mobile only) ── */
+    .week-tabs {
+      display: none;
+      gap: 8px;
+      margin: 14px 0 4px;
+    }
+    .week-tab {
+      flex: 1;
+      padding: 9px 8px;
+      font-family: inherit;
+      font-size: 0.82rem;
+      font-weight: 600;
+      border: 2px solid #e0dbd4;
+      border-radius: 10px;
+      background: #fff;
+      color: #999;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .week-tab.active {
+      background: #6ea8c8;
+      border-color: #6ea8c8;
+      color: #fff;
+    }
+
+    /* ── MOBILE OVERRIDES ── */
+    @media (max-width: 600px) {
+      header { padding: 12px 14px 10px; }
+
+      .header-top { margin-bottom: 10px; gap: 8px; }
+      .header-title { font-size: 1.15rem; }
+
+      .summary-card { padding: 8px 12px; min-width: 0; }
+      .summary-count { font-size: 1.6rem; }
+      .summary-name { font-size: 0.9rem; }
+
+      main { padding: 12px 12px 32px; }
+
+      .week-heading { display: none; }
+      .week-tabs { display: flex; }
+
+      .week-grid { grid-template-columns: 1fr; }
+
+      /* larger tap targets */
+      .chore-header { padding: 10px 11px; }
+      .chore-name { font-size: 0.85rem; }
+      .chore-icon { font-size: 1.05rem; }
+
+      .check-all-btn {
+        width: 24px;
+        height: 24px;
+        font-size: 0.75rem;
+      }
+
+      .sub-item { padding: 5px 0; }
+      .sub-item input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        margin-top: 1px;
+      }
+      .sub-label { font-size: 0.82rem; }
+
+      .assignee-sel {
+        font-size: 0.78rem;
+        padding: 4px 6px;
+        max-width: 64px;
+      }
+
+      .add-task-btn { padding: 9px 8px; font-size: 0.82rem; }
+
+      .day-header { padding: 10px 13px 8px; }
+      .day-date { font-size: 1.3rem; }
+    }
   </style>
 </head>
 <body>
@@ -330,6 +454,11 @@
     </div>
   </div>
 </header>
+
+<div class="week-tabs" id="week-tabs">
+  <button class="week-tab active" data-week="0">שבוע 1 · 15–21.6</button>
+  <button class="week-tab" data-week="1">שבוע 2 · 22–28.6</button>
+</div>
 
 <div id="loading" style="text-align:center;padding:60px 20px;color:#aaa;font-size:1.1rem;">מתחבר לשרת...</div>
 <main id="cal" style="display:none"></main>
@@ -743,6 +872,69 @@ function buildDayCard(date) {
     if (result) body.appendChild(result.block);
   }
 
+  // ── add task button
+  const addBtn = document.createElement('button');
+  addBtn.className = 'add-task-btn';
+  addBtn.textContent = '+ הוסף משימה';
+
+  const addForm = document.createElement('div');
+  addForm.className = 'add-task-form';
+  addForm.style.display = 'none';
+
+  const choreSelect = document.createElement('select');
+  const assignSel   = document.createElement('select');
+  PEOPLE.forEach(p => {
+    const o = document.createElement('option');
+    o.value = p; o.textContent = p;
+    assignSel.appendChild(o);
+  });
+
+  const acts = document.createElement('div');
+  acts.className = 'add-task-actions';
+  const okBtn  = document.createElement('button');
+  okBtn.className = 'add-task-ok'; okBtn.textContent = 'הוסף';
+  const canBtn = document.createElement('button');
+  canBtn.className = 'add-task-cancel'; canBtn.textContent = 'ביטול';
+  acts.appendChild(okBtn); acts.appendChild(canBtn);
+
+  addForm.appendChild(choreSelect);
+  addForm.appendChild(assignSel);
+  addForm.appendChild(acts);
+
+  addBtn.addEventListener('click', () => {
+    choreSelect.innerHTML = '';
+    const available = Object.keys(CHORE_DEFS).filter(k => !(liveSchedule[date] && liveSchedule[date][k] !== undefined));
+    if (!available.length) { addBtn.textContent = 'כל המשימות כבר קיימות'; return; }
+    available.forEach(k => {
+      const o = document.createElement('option');
+      o.value = k; o.textContent = `${CHORE_DEFS[k].icon} ${CHORE_DEFS[k].label}`;
+      choreSelect.appendChild(o);
+    });
+    addForm.style.display = '';
+    addBtn.style.display  = 'none';
+  });
+
+  canBtn.addEventListener('click', () => {
+    addForm.style.display = 'none';
+    addBtn.style.display  = '';
+    addBtn.textContent = '+ הוסף משימה';
+  });
+
+  okBtn.addEventListener('click', () => {
+    const key      = choreSelect.value;
+    const assignee = assignSel.value;
+    if (!key) return;
+    if (!liveSchedule[date]) liveSchedule[date] = {};
+    liveSchedule[date][key] = assignee;
+    saveLiveSchedule();
+    saveAssignee(date, key, assignee);
+    rebuildDayBody(date);
+    updateSummary();
+  });
+
+  body.appendChild(addBtn);
+  body.appendChild(addForm);
+
   // ── drop zone
   body.addEventListener('dragover', e => {
     e.preventDefault();
@@ -799,6 +991,14 @@ function rebuildDayBody(date) {
   card.replaceWith(buildDayCard(date));
 }
 
+let activeWeekTab = 0;
+
+function applyWeekTabs() {
+  document.querySelectorAll('.week-section').forEach((sec, i) => {
+    sec.style.display = (i === activeWeekTab) ? '' : 'none';
+  });
+}
+
 function buildCalendar() {
   const cal   = document.getElementById('cal');
   const dates = Object.keys(liveSchedule).sort();
@@ -806,17 +1006,34 @@ function buildCalendar() {
   const labels = ['שבוע ראשון · 15–21 ביוני', 'שבוע שני · 22–28 ביוני'];
 
   weeks.forEach((week, wi) => {
+    const section = document.createElement('div');
+    section.className = 'week-section';
+    section.dataset.week = wi;
+
     const lbl = document.createElement('div');
     lbl.className = 'week-heading';
     lbl.textContent = labels[wi];
-    cal.appendChild(lbl);
+    section.appendChild(lbl);
 
     const grid = document.createElement('div');
     grid.className = 'week-grid';
     week.forEach(d => grid.appendChild(buildDayCard(d)));
-    cal.appendChild(grid);
+    section.appendChild(grid);
+
+    cal.appendChild(section);
   });
+
+  applyWeekTabs();
 }
+
+// Week tab clicks
+document.getElementById('week-tabs').addEventListener('click', e => {
+  const btn = e.target.closest('.week-tab');
+  if (!btn) return;
+  activeWeekTab = +btn.dataset.week;
+  document.querySelectorAll('.week-tab').forEach(b => b.classList.toggle('active', b === btn));
+  applyWeekTabs();
+});
 
 // ──────────────────────────────────────────
 // EVENT DELEGATION
@@ -828,86 +1045,4 @@ document.addEventListener('change', e => {
   // Checkbox
   if (el.classList.contains('sub-cb')) {
     const { date, chore, idx } = el.dataset;
-    saveCheck(date, chore, +idx, el.checked);
-    el.closest('.sub-item').classList.toggle('done', el.checked);
-
-    // update progress label
-    const def   = CHORE_DEFS[chore];
-    const total = def.subtasks.length;
-    const done  = def.subtasks.reduce((n,_,i) => n + (getCheck(date, chore, i) ? 1 : 0), 0);
-    const block = el.closest('.chore-block');
-    block.querySelector('.chore-prog').textContent = `${done}/${total}`;
-    block.querySelector('.check-all-btn').classList.toggle('all-done', done === total);
-    return;
-  }
-
-  // Assignee dropdown
-  if (el.classList.contains('assignee-sel')) {
-    const { date, chore } = el.dataset;
-    saveAssignee(date, chore, el.value);
-
-    const hdr = el.closest('.chore-header');
-    hdr.classList.remove('noa-h', 'nadav-h');
-    hdr.classList.add(assigneeClass(el.value));
-    updateSummary();
-  }
-});
-
-// ──────────────────────────────────────────
-// FIREBASE INIT + REAL-TIME LISTENER
-// ──────────────────────────────────────────
-
-async function initFromFirebase() {
-  const snap = await db.ref('/').once('value');
-  const data = snap.val() || {};
-
-  if (data.schedule) {
-    liveSchedule = data.schedule;
-    // make sure original dates always exist
-    for (const d of Object.keys(SCHEDULE)) {
-      if (!liveSchedule[d]) liveSchedule[d] = { ...SCHEDULE[d] };
-    }
-  } else {
-    // first ever load — seed Firebase with defaults
-    liveSchedule = JSON.parse(JSON.stringify(SCHEDULE));
-    await db.ref('schedule').set(liveSchedule);
-  }
-
-  memAssignees = data.assignees || {};
-  memChecks    = data.checks    || {};
-}
-
-function setupRealtimeListener() {
-  db.ref('/').on('value', snap => {
-    if (isLocalWrite) return; // skip echo of our own writes
-    const data = snap.val() || {};
-    memAssignees = data.assignees || {};
-    memChecks    = data.checks    || {};
-    if (data.schedule) liveSchedule = data.schedule;
-
-    // re-render calendar with remote data
-    const cal = document.getElementById('cal');
-    cal.innerHTML = '';
-    buildCalendar();
-    updateSummary();
-  });
-}
-
-(async () => {
-  const loadEl = document.getElementById('loading');
-  const calEl  = document.getElementById('cal');
-  try {
-    await initFromFirebase();
-  } catch(e) {
-    loadEl.textContent = '⚠️ שגיאה בהתחברות ל-Firebase. בדקי שהפרטים בקוד נכונים.';
-    return;
-  }
-  loadEl.style.display = 'none';
-  calEl.style.display  = '';
-  buildCalendar();
-  updateSummary();
-  setupRealtimeListener();
-})();
-</script>
-</body>
-</html>
+    saveCheck(date, c
