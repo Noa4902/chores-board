@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="he">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>לוח משימות בית | יוני 2026</title>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: #f0ede8;
+      color: #2d2d2d;
+      min-height: 100vh;
+      direction: rtl;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: #fff;
+      padding: 18px 24px 14px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+      position: sticky;
+      top: 0;
+      z-index: 200;
+    }
+
+    .header-top {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .header-title {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: #1a1a1a;
+    }
+
+    .header-dates {
+      font-size: 0.82rem;
+      color: #aaa;
+    }
+
+    .summary-bar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .summary-card {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      background: #f8f7f5;
+      border-radius: 10px;
+      padding: 10px 16px;
+      min-width: 200px;
+      flex: 1;
+    }
+
+    .summary-card.noa  { border-right: 4px solid #d98fa5; }
+    .summary-card.nadav { border-right: 4px solid #6ea8c8; }
+
+    .summary-info { flex: 1; }
+    .summary-name  { font-weight: 700; font-size: 1rem; color: #222; }
+    .summary-label { font-size: 0.72rem; color: #aaa; margin-top: 1px; }
+
+    .summary-count {
+      font-size: 2rem;
+      font-weight: 800;
+      color: #555;
+      line-height: 1;
+    }
+
+    .progress-wrap {
+      margin-top: 6px;
+      height: 5px;
+      background: #e5e2dd;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+    .noa  .progress-fill { background: #d98fa5; }
+    .nadav .progress-fill { background: #6ea8c8; }
+
+    /* ── MAIN ── */
+    main {
+      padding: 20px 20px 40px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    .week-heading {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      color: #999;
+      text-transform: uppercase;
+      margin: 22px 0 10px 2px;
+    }
+
+    .week-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+
+    @media (max-width: 900px)  { .week-grid { grid-template-columns: repeat(3, 1fr); } }
+    @media (max-width: 600px)  { .week-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 380px)  { .week-grid { grid-template-columns: 1fr; } }
+
+    /* ── DAY CARD ── */
+    .day-card {
+      background: #fff;
+      border-radius: 14px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: box-shadow 0.2s;
+    }
+    .day-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.10); }
+
+    .day-header {
+      padding: 10px 13px 8px;
+      background: #f9f8f6;
+      border-bottom: 1px solid #ede9e3;
+    }
+    .day-name { font-size: 0.7rem; color: #bbb; letter-spacing: 0.04em; }
+    .day-date { font-size: 1.5rem; font-weight: 800; color: #1a1a1a; line-height: 1.1; }
+
+    .day-note {
+      font-size: 0.68rem;
+      color: #c0956a;
+      margin-top: 3px;
+      background: #fff7f0;
+      border-radius: 4px;
+      padding: 2px 5px;
+      display: inline-block;
+    }
+
+    .day-body {
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+    }
+
+    /* ── CHORE BLOCK ── */
+    .chore-block {
+      border-radius: 9px;
+      border: 1px solid #ece8e2;
+      overflow: hidden;
+      background: #faf9f7;
+    }
+
+    .chore-header {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 6px 9px;
+      cursor: pointer;
+      user-select: none;
+      border-right: 3px solid transparent;
+      transition: border-color 0.15s;
+    }
+    .chore-header.noa-h   { border-right-color: #d98fa5; }
+    .chore-header.nadav-h { border-right-color: #6ea8c8; }
+
+    .check-all-btn {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      border: 2px solid #ccc;
+      background: #fff;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.65rem;
+      color: transparent;
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+      padding: 0;
+      line-height: 1;
+    }
+    .check-all-btn:hover { border-color: #999; }
+    .check-all-btn.all-done {
+      background: #6ea8c8;
+      border-color: #6ea8c8;
+      color: #fff;
+    }
+
+    .chore-icon { font-size: 0.95rem; flex-shrink: 0; }
+
+    .chore-name {
+      flex: 1;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: #333;
+      min-width: 0;
+      word-break: break-word;
+      line-height: 1.3;
+    }
+
+    .chore-prog {
+      font-size: 0.65rem;
+      color: #bbb;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .assignee-sel {
+      font-size: 0.7rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 2px 5px;
+      background: #fff;
+      color: #444;
+      cursor: pointer;
+      font-family: inherit;
+      flex-shrink: 0;
+      max-width: 58px;
+    }
+    .assignee-sel option { font-family: inherit; }
+
+    .toggle-icon {
+      font-size: 0.65rem;
+      color: #ccc;
+      transition: transform 0.18s;
+      flex-shrink: 0;
+    }
+    .chore-header.is-open .toggle-icon { transform: rotate(90deg); }
+
+    .chore-subtasks {
+      display: none;
+      padding: 5px 9px 8px 9px;
+      border-top: 1px solid #ece8e2;
+    }
+    .chore-subtasks.is-open { display: block; }
+
+    .sub-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 7px;
+      padding: 3px 0;
+    }
+    .sub-item input[type="checkbox"] {
+      margin-top: 2px;
+      flex-shrink: 0;
+      width: 13px;
+      height: 13px;
+      cursor: pointer;
+      accent-color: #6ea8c8;
+    }
+    .sub-label {
+      font-size: 0.75rem;
+      color: #555;
+      line-height: 1.45;
+      cursor: pointer;
+    }
+    .sub-item.done .sub-label {
+      text-decoration: line-through;
+      color: #c0bab4;
+    }
+
+    /* ── DRAG & DROP ── */
+    .chore-block[draggable="true"] { cursor: grab; }
+    .chore-block[draggable="true"]:active { cursor: grabbing; }
+    .chore-block.is-dragging { opacity: 0.35; }
+
+    .drag-handle {
+      font-size: 0.7rem;
+      color: #d0cbc4;
+      flex-shrink: 0;
+      letter-spacing: -1px;
+      padding-left: 2px;
+    }
+
+    .day-body.drag-over {
+      background: #eef5fa;
+      outline: 2px dashed #6ea8c8;
+      border-radius: 9px;
+    }
+    .day-body.drag-reject {
+      outline: 2px dashed #d98fa5;
+      border-radius: 9px;
+    }
+
+    footer {
+      text-align: center;
+      padding: 20px;
+      color: #ccc;
+      font-size: 0.72rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <span class="header-title">🏠 לוח משימות בית</span>
+    <span class="header-dates">15.6 – 28.6.2026</span>
+  </div>
+  <div class="summary-bar">
+    <div class="summary-card noa">
+      <div class="summary-info">
+        <div class="summary-name">נועה</div>
+        <div class="summary-label">משימות ראשיות</div>
+        <div class="progress-wrap"><div class="progress-fill" id="noa-bar"></div></div>
+      </div>
+      <div class="summary-count" id="noa-count">–</div>
+    </div>
+    <div class="summary-card nadav">
+      <div class="summary-info">
+        <div class="summary-name">נדב</div>
+        <div class="summary-label">משימות ראשיות</div>
+        <div class="progress-wrap"><div class="progress-fill" id="nadav-bar"></div></div>
+      </div>
+      <div class="summary-count" id="nadav-count">–</div>
+    </div>
+  </div>
+</header>
+
+<div id="loading" style="text-align:center;padding:60px 20px;color:#aaa;font-size:1.1rem;">מתחבר לשרת...</div>
+<main id="cal" style="display:none"></main>
+
+<footer>נועה ונדב · יוני 2026 · כל הזכויות שמורות לסנוקי</footer>
+
+<script>
+// ══════════════════════════════════════════
+// הגדרות Firebase — מלאי את הפרטים שלך כאן
+// ══════════════════════════════════════════
+const FIREBASE_CONFIG = {
+  apiKey:      "AIzaSyBZCu2Ar5tL6D_YpQ0sllpKvr27mmBDsFA",
+  authDomain:  "snooki-chores.firebaseapp.com",
+  databaseURL: "https://snooki-chores-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:   "snooki-chores",
+  appId:       "1:134562556028:web:425ef488d1c614218d01f9",
+};
+// ══════════════════════════════════════════
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.database();
+
+// ──────────────────────────────────────────
+// DATA
+// ──────────────────────────────────────────
+
+const PEOPLE = ['נועה', 'נדב'];
+
+const CHORE_DEFS = {
+  dishes: {
+    icon: '🍽️', label: 'כלים ומטבח',
+    subtasks: [
+      'לרוקן מדיח ולסדר כלים',
+      'להכניס כלים מלוכלכים למדיח',
+      'לשטוף כלים שנשארו ביד',
+      'לנקות מסנן / משולש הכיור',
+      'לנקות כיור',
+      'לנקות משטח עבודה'
+    ]
+  },
+  laundry: {
+    icon: '👕', label: 'כביסה',
+    subtasks: [
+      'להפעיל מכונת כביסה',
+      'להעביר לייבשת / לתלות',
+      'לקפל כביסה יבשה',
+      'להחזיר בגדים לארונות'
+    ]
+  },
+  tidy: {
+    icon: '🧹', label: 'סדר כללי',
+    subtasks: [
+      'להחזיר כוסות וצלחות למטבח',
+      'להחזיר דברים למקומם',
+      'לאסוף נעליים, גרביים וחפצים מהרצפה',
+      'לסדר סלון ואזורים משותפים'
+    ]
+  },
+  trash: {
+    icon: '🗑️', label: 'זבל',
+    subtasks: [
+      'להוציא זבל',
+      'להכניס שקית חדשה'
+    ]
+  },
+  snooki: {
+    icon: '🐕', label: 'סנוקי',
+    subtasks: [
+      'תרופת בוקר',
+      'תרופת ערב',
+      'אוכל',
+      'מים',
+      'טיול קצר, 5–10 דקות',
+      'לנקות קקי'
+    ]
+  },
+  groceries: {
+    icon: '🛒', label: 'קניות',
+    subtasks: [
+      'לבדוק מה חסר',
+      'להכין רשימת קניות',
+      'לקנות מצרכים',
+      'לפרוק ולסדר הכל'
+    ]
+  },
+  cooking: {
+    icon: '🍳', label: 'בישול',
+    subtasks: ['הכנת ארוחה']
+  }
+};
+
+const HEB_DAYS = ['ראשון','שני','שלישי','רביעי','חמישי','שישי','שבת'];
+
+// Notes shown under the date
+const DAY_NOTES = {
+  '2026-06-15': 'נועה: שיעורים עד 20:45',
+  '2026-06-16': 'נדב: לימודים ערב | נועה: ארטסמיס 21:00',
+  '2026-06-17': 'נדב: לימודים ערב | נועה: Human Skills 21:00',
+  '2026-06-18': 'נועה: שיעור 11:30–14:45',
+  '2026-06-21': 'שניהם עסוקים! נועה: שיעורים 11:30–20:45 | נדב: לימודים ערב',
+  '2026-06-23': 'נדב: טיפול בוקר + לימודים ערב | נועה: ארטסמיס 21:00',
+  '2026-06-24': 'נדב: לימודים ערב | נועה: Human Skills 21:00',
+  '2026-06-25': 'נועה: שיעור 11:30–14:45',
+  '2026-06-26': 'נועה: סיום סמסטר ב׳ 08:00–18:00 — נדב לוקח הכל!'
+};
+
+// Assignment defaults. Laundry appears every day.
+// Keys: choreKey → person name in Hebrew
+const SCHEDULE = {
+  '2026-06-15': {
+    dishes:'נדב', laundry:'נדב', tidy:'נועה', trash:'נדב', snooki:'נדב'
+  },
+  '2026-06-16': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', snooki:'נועה', cooking:'נועה'
+  },
+  '2026-06-17': {
+    dishes:'נועה', laundry:'נדב', tidy:'נדב', trash:'נדב', snooki:'נועה', groceries:'נדב'
+  },
+  '2026-06-18': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', snooki:'נדב', cooking:'נועה'
+  },
+  '2026-06-19': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', trash:'נדב', snooki:'נדב', cooking:'נועה'
+  },
+  '2026-06-20': {
+    dishes:'נועה', laundry:'נדב', tidy:'נדב', snooki:'נועה', groceries:'נועה'
+  },
+  '2026-06-21': {
+    dishes:'נדב', laundry:'נדב', tidy:'נועה', trash:'נדב', snooki:'נועה'
+  },
+  '2026-06-22': {
+    dishes:'נדב', laundry:'נועה', tidy:'נדב', snooki:'נדב', groceries:'נועה', cooking:'נועה'
+  },
+  '2026-06-23': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', snooki:'נועה', cooking:'נועה'
+  },
+  '2026-06-24': {
+    dishes:'נועה', laundry:'נדב', tidy:'נדב', trash:'נדב', snooki:'נועה'
+  },
+  '2026-06-25': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', trash:'נועה', snooki:'נדב', cooking:'נועה'
+  },
+  '2026-06-26': {
+    dishes:'נדב', laundry:'נדב', tidy:'נדב', trash:'נדב', snooki:'נדב', groceries:'נדב'
+  },
+  '2026-06-27': {
+    dishes:'נדב', laundry:'נדב', tidy:'נועה', snooki:'נועה', cooking:'נועה'
+  },
+  '2026-06-28': {
+    dishes:'נדב', laundry:'נועה', tidy:'נועה', trash:'נועה', snooki:'נועה', cooking:'נועה'
+  }
+};
+
+// ──────────────────────────────────────────
+// LIVE SCHEDULE + FIREBASE STATE
+// ──────────────────────────────────────────
+
+let liveSchedule = JSON.parse(JSON.stringify(SCHEDULE));
+let memAssignees = {};   // { "date__key": "person" }
+let memChecks    = {};   // { "date__key__idx": true }
+let dragState    = null; // set during dragstart
+
+const FA = (d,k)   => `${d}__${k}`;
+const FC = (d,k,i) => `${d}__${k}__${i}`;
+
+// ── Local-write debounce: suppress our own Firebase echo
+let isLocalWrite = false;
+let lwTimer;
+function setLocalWrite() {
+  isLocalWrite = true;
+  clearTimeout(lwTimer);
+  lwTimer = setTimeout(() => { isLocalWrite = false; }, 2000);
+}
+
+// ──────────────────────────────────────────
+// STORAGE HELPERS (Firebase-backed)
+// ──────────────────────────────────────────
+
+function getAssignee(date, key) {
+  return memAssignees[FA(date,key)] || (liveSchedule[date] && liveSchedule[date][key]);
+}
+function saveAssignee(date, key, val) {
+  memAssignees[FA(date,key)] = val;
+  setLocalWrite();
+  db.ref('assignees/' + FA(date,key)).set(val);
+}
+function getCheck(date, key, idx) {
+  return memChecks[FC(date,key,idx)] === true;
+}
+function saveCheck(date, key, idx, val) {
+  const k = FC(date,key,idx);
+  if (val) memChecks[k] = true; else delete memChecks[k];
+  setLocalWrite();
+  db.ref('checks/' + k).set(val || null);
+}
+function saveLiveSchedule() {
+  setLocalWrite();
+  db.ref('schedule').set(liveSchedule);
+}
+
+// ──────────────────────────────────────────
+// SUMMARY
+// ──────────────────────────────────────────
+
+function updateSummary() {
+  let noa = 0, nadav = 0, total = 0;
+  for (const [date, day] of Object.entries(liveSchedule)) {
+    for (const key of Object.keys(day)) {
+      total++;
+      const who = getAssignee(date, key);
+      if (who === 'נועה') noa++;
+      else nadav++;
+    }
+  }
+  document.getElementById('noa-count').textContent   = noa;
+  document.getElementById('nadav-count').textContent = nadav;
+  const pct = n => total ? Math.round(n / total * 100) + '%' : '0%';
+  document.getElementById('noa-bar').style.width   = pct(noa);
+  document.getElementById('nadav-bar').style.width = pct(nadav);
+}
+
+// ──────────────────────────────────────────
+// BUILD
+// ──────────────────────────────────────────
+
+function assigneeClass(who) {
+  return who === 'נועה' ? 'noa-h' : 'nadav-h';
+}
+
+function buildChoreBlock(date, key) {
+  const def = CHORE_DEFS[key];
+  if (!def) return null;
+  const who   = getAssignee(date, key);
+  const total = def.subtasks.length;
+  const done  = def.subtasks.reduce((n,_,i) => n + (getCheck(date, key, i) ? 1 : 0), 0);
+
+  const block  = document.createElement('div');
+  block.className = 'chore-block';
+  block.draggable = true;
+  block.dataset.date  = date;
+  block.dataset.chore = key;
+
+  // ── header row
+  const hdr = document.createElement('div');
+  hdr.className = `chore-header ${assigneeClass(who)}`;
+  hdr.dataset.open = 'false';
+
+  // ── check-all button
+  const checkAllBtn = document.createElement('button');
+  checkAllBtn.className = 'check-all-btn' + (done === total ? ' all-done' : '');
+  checkAllBtn.title = 'סמן הכל';
+  checkAllBtn.textContent = '✓';
+
+  const dragHandle = document.createElement('span');
+  dragHandle.className = 'drag-handle';
+  dragHandle.textContent = '⠿';
+  dragHandle.title = 'גרור ליום אחר';
+
+  const icon = document.createElement('span');
+  icon.className = 'chore-icon';
+  icon.textContent = def.icon;
+
+  const name = document.createElement('span');
+  name.className = 'chore-name';
+  name.textContent = def.label;
+
+  const prog = document.createElement('span');
+  prog.className = 'chore-prog';
+  prog.textContent = `${done}/${total}`;
+
+  const sel = document.createElement('select');
+  sel.className = 'assignee-sel';
+  sel.dataset.date  = date;
+  sel.dataset.chore = key;
+  PEOPLE.forEach(p => {
+    const opt = document.createElement('option');
+    opt.value = p;
+    opt.textContent = p;
+    if (p === who) opt.selected = true;
+    sel.appendChild(opt);
+  });
+
+  const arrow = document.createElement('span');
+  arrow.className = 'toggle-icon';
+  arrow.textContent = '›';
+
+  hdr.appendChild(checkAllBtn);
+  hdr.appendChild(dragHandle);
+  hdr.appendChild(icon);
+  hdr.appendChild(name);
+  hdr.appendChild(prog);
+  hdr.appendChild(sel);
+  hdr.appendChild(arrow);
+
+  // ── subtasks
+  const subs = document.createElement('div');
+  subs.className = 'chore-subtasks';
+  subs.dataset.date  = date;
+  subs.dataset.chore = key;
+
+  def.subtasks.forEach((text, i) => {
+    const checked = getCheck(date, key, i);
+    const row = document.createElement('div');
+    row.className = 'sub-item' + (checked ? ' done' : '');
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.checked = checked;
+    cb.id = `cb_${date}_${key}_${i}`;
+    cb.dataset.date  = date;
+    cb.dataset.chore = key;
+    cb.dataset.idx   = i;
+    cb.className = 'sub-cb';
+
+    const lbl = document.createElement('label');
+    lbl.htmlFor = cb.id;
+    lbl.className = 'sub-label';
+    lbl.textContent = text;
+
+    row.appendChild(cb);
+    row.appendChild(lbl);
+    subs.appendChild(row);
+  });
+
+  // ── drag events
+  block.addEventListener('dragstart', e => {
+    e.stopPropagation();
+    dragState = { date, key, assignee: getAssignee(date, key) };
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', JSON.stringify(dragState));
+    setTimeout(() => block.classList.add('is-dragging'), 0);
+  });
+  block.addEventListener('dragend', () => {
+    block.classList.remove('is-dragging');
+    dragState = null;
+  });
+
+  // ── check-all click
+  checkAllBtn.addEventListener('click', e => {
+    e.stopPropagation();
+    const allDone = def.subtasks.every((_, i) => getCheck(date, key, i));
+    const newVal  = !allDone;
+    def.subtasks.forEach((_, i) => {
+      saveCheck(date, key, i, newVal);
+    });
+    // update DOM subtasks
+    subs.querySelectorAll('.sub-item').forEach((row, i) => {
+      row.querySelector('input').checked = newVal;
+      row.classList.toggle('done', newVal);
+    });
+    const newDone = newVal ? total : 0;
+    prog.textContent = `${newDone}/${total}`;
+    checkAllBtn.classList.toggle('all-done', newVal);
+  });
+
+  // ── toggle click
+  hdr.addEventListener('click', e => {
+    if (e.target.tagName === 'SELECT') return;
+    const isOpen = hdr.dataset.open === 'true';
+    hdr.dataset.open = !isOpen;
+    hdr.classList.toggle('is-open', !isOpen);
+    subs.classList.toggle('is-open', !isOpen);
+  });
+
+  block.appendChild(hdr);
+  block.appendChild(subs);
+  return { block, hdr, prog };
+}
+
+function buildDayCard(date) {
+  const dayData = liveSchedule[date];
+  const dt      = new Date(date + 'T12:00:00');
+  const dayName = HEB_DAYS[dt.getDay()];
+  const d = dt.getDate(), m = dt.getMonth() + 1;
+
+  const card = document.createElement('div');
+  card.className = 'day-card';
+  card.dataset.date = date;
+
+  // header
+  const dh = document.createElement('div');
+  dh.className = 'day-header';
+
+  const dn = document.createElement('div');
+  dn.className = 'day-name';
+  dn.textContent = dayName;
+
+  const dd = document.createElement('div');
+  dd.className = 'day-date';
+  dd.textContent = `${d}.${m}`;
+
+  dh.appendChild(dn);
+  dh.appendChild(dd);
+
+  if (DAY_NOTES[date]) {
+    const note = document.createElement('div');
+    note.className = 'day-note';
+    note.textContent = DAY_NOTES[date];
+    dh.appendChild(note);
+  }
+
+  card.appendChild(dh);
+
+  // body
+  const body = document.createElement('div');
+  body.className = 'day-body';
+  body.dataset.date = date;
+
+  for (const key of Object.keys(dayData)) {
+    const result = buildChoreBlock(date, key);
+    if (result) body.appendChild(result.block);
+  }
+
+  // ── drop zone
+  body.addEventListener('dragover', e => {
+    e.preventDefault();
+    if (!dragState) return;
+    const { date: srcDate, key: srcKey } = dragState;
+    const alreadyHere = liveSchedule[date] && liveSchedule[date][srcKey] !== undefined;
+    if (srcDate === date || alreadyHere) {
+      body.classList.remove('drag-over');
+      body.classList.add('drag-reject');
+      e.dataTransfer.dropEffect = 'none';
+    } else {
+      body.classList.remove('drag-reject');
+      body.classList.add('drag-over');
+      e.dataTransfer.dropEffect = 'move';
+    }
+  });
+
+  body.addEventListener('dragleave', e => {
+    if (!body.contains(e.relatedTarget)) {
+      body.classList.remove('drag-over', 'drag-reject');
+    }
+  });
+
+  body.addEventListener('drop', e => {
+    e.preventDefault();
+    body.classList.remove('drag-over', 'drag-reject');
+    if (!dragState) return;
+    const { date: srcDate, key: srcKey, assignee } = dragState;
+    if (!srcDate || !srcKey || srcDate === date) return;
+    if (liveSchedule[date] && liveSchedule[date][srcKey] !== undefined) return;
+
+    // move in liveSchedule
+    if (!liveSchedule[date]) liveSchedule[date] = {};
+    liveSchedule[date][srcKey] = assignee;
+    delete liveSchedule[srcDate][srcKey];
+    saveLiveSchedule();
+
+    // transfer assignee in localStorage
+    saveAssignee(date, srcKey, assignee);
+
+    // re-render both day bodies
+    rebuildDayBody(srcDate);
+    rebuildDayBody(date);
+    updateSummary();
+  });
+
+  card.appendChild(body);
+  return card;
+}
+
+function rebuildDayBody(date) {
+  const card = document.querySelector(`.day-card[data-date="${date}"]`);
+  if (!card) return;
+  card.replaceWith(buildDayCard(date));
+}
+
+function buildCalendar() {
+  const cal   = document.getElementById('cal');
+  const dates = Object.keys(liveSchedule).sort();
+  const weeks = [ dates.slice(0, 7), dates.slice(7) ];
+  const labels = ['שבוע ראשון · 15–21 ביוני', 'שבוע שני · 22–28 ביוני'];
+
+  weeks.forEach((week, wi) => {
+    const lbl = document.createElement('div');
+    lbl.className = 'week-heading';
+    lbl.textContent = labels[wi];
+    cal.appendChild(lbl);
+
+    const grid = document.createElement('div');
+    grid.className = 'week-grid';
+    week.forEach(d => grid.appendChild(buildDayCard(d)));
+    cal.appendChild(grid);
+  });
+}
+
+// ──────────────────────────────────────────
+// EVENT DELEGATION
+// ──────────────────────────────────────────
+
+document.addEventListener('change', e => {
+  const el = e.target;
+
+  // Checkbox
+  if (el.classList.contains('sub-cb')) {
+    const { date, chore, idx } = el.dataset;
+    saveCheck(date, chore, +idx, el.checked);
+    el.closest('.sub-item').classList.toggle('done', el.checked);
+
+    // update progress label
+    const def   = CHORE_DEFS[chore];
+    const total = def.subtasks.length;
+    const done  = def.subtasks.reduce((n,_,i) => n + (getCheck(date, chore, i) ? 1 : 0), 0);
+    const block = el.closest('.chore-block');
+    block.querySelector('.chore-prog').textContent = `${done}/${total}`;
+    block.querySelector('.check-all-btn').classList.toggle('all-done', done === total);
+    return;
+  }
+
+  // Assignee dropdown
+  if (el.classList.contains('assignee-sel')) {
+    const { date, chore } = el.dataset;
+    saveAssignee(date, chore, el.value);
+
+    const hdr = el.closest('.chore-header');
+    hdr.classList.remove('noa-h', 'nadav-h');
+    hdr.classList.add(assigneeClass(el.value));
+    updateSummary();
+  }
+});
+
+// ──────────────────────────────────────────
+// FIREBASE INIT + REAL-TIME LISTENER
+// ──────────────────────────────────────────
+
+async function initFromFirebase() {
+  const snap = await db.ref('/').once('value');
+  const data = snap.val() || {};
+
+  if (data.schedule) {
+    liveSchedule = data.schedule;
+    // make sure original dates always exist
+    for (const d of Object.keys(SCHEDULE)) {
+      if (!liveSchedule[d]) liveSchedule[d] = { ...SCHEDULE[d] };
+    }
+  } else {
+    // first ever load — seed Firebase with defaults
+    liveSchedule = JSON.parse(JSON.stringify(SCHEDULE));
+    await db.ref('schedule').set(liveSchedule);
+  }
+
+  memAssignees = data.assignees || {};
+  memChecks    = data.checks    || {};
+}
+
+function setupRealtimeListener() {
+  db.ref('/').on('value', snap => {
+    if (isLocalWrite) return; // skip echo of our own writes
+    const data = snap.val() || {};
+    memAssignees = data.assignees || {};
+    memChecks    = data.checks    || {};
+    if (data.schedule) liveSchedule = data.schedule;
+
+    // re-render calendar with remote data
+    const cal = document.getElementById('cal');
+    cal.innerHTML = '';
+    buildCalendar();
+    updateSummary();
+  });
+}
+
+(async () => {
+  const loadEl = document.getElementById('loading');
+  const calEl  = document.getElementById('cal');
+  try {
+    await initFromFirebase();
+  } catch(e) {
+    loadEl.textContent = '⚠️ שגיאה בהתחברות ל-Firebase. בדקי שהפרטים בקוד נכונים.';
+    return;
+  }
+  loadEl.style.display = 'none';
+  calEl.style.display  = '';
+  buildCalendar();
+  updateSummary();
+  setupRealtimeListener();
+})();
+</script>
+</body>
+</html>
